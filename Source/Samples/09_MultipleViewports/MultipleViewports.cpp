@@ -47,14 +47,143 @@
 URHO3D_DEFINE_APPLICATION_MAIN(MultipleViewports)
 
 MultipleViewports::MultipleViewports(Context* context) :
-    Sample(context),
-    drawDebug_(false)
+Sample(context),
+drawDebug_(false)
 {
+    engineParameters_["WindowTitle"] = GetTypeName();
+    engineParameters_["FullScreen"] = false;
+    engineParameters_["Headless"] = false;
+    engineParameters_["WindowWidth"] = 1280;
+    engineParameters_["WindowHeight"] = 720;
+    engineParameters_["LogName"] = GetSubsystem<FileSystem>()->GetAppPreferencesDir("urho3d", "logs") + GetTypeName() + ".log";
+    engineParameters_["RenderPath"] = "Bin\CoreData\RenderPaths\Forward.xml";
 }
+Scene * scene1;
+Scene * scene2;
+Node* camera1Node;
+Node* camera2Node;
+Camera* camera1;
+Camera* camera2;
+Viewport* viewport1;
+Viewport* viewport2;
+RenderPath* overlayRenderPath;
 
 void MultipleViewports::Start()
 {
-    // Execute base class startup
+    Sample::Start();
+
+    ResourceCache* cache = GetSubsystem<ResourceCache>();
+
+    scene1 = new Scene(context_);
+    SharedPtr<File> file = cache->GetFile("Scenes/SceneLoadExample.xml");
+    scene1->LoadXML(*file);
+
+    scene2 = new Scene(context_);
+    SharedPtr<File> file2 = cache->GetFile("Scenes/SceneLoadExample.xml");
+    scene2->LoadXML(*file2);
+
+
+
+    Graphics* graphics = GetSubsystem<Graphics>();
+    Renderer* renderer = GetSubsystem<Renderer>();
+    //ResourceCache* cache = GetSubsystem<ResourceCache>();
+    // Called after engine initialization. Setup application & subscribe to events here
+    //SubscribeToEvent(E_KEYDOWN,HANDLER(MultipleViewports,HandleKeyDown));
+    SubscribeToEvents();
+
+    Engine* engine = GetSubsystem<Engine>();
+    engine->SetMaxFps(20000);
+
+ 
+
+    camera1Node = scene1->CreateChild("Camera");
+    camera1Node->CreateComponent<Camera>();
+
+    camera2Node = scene2->CreateChild("Camera");
+    camera2Node->CreateComponent<Camera>();
+
+    camera1 = camera1Node->GetComponent<Camera>();
+    camera2 = camera2Node->GetComponent<Camera>();
+    camera2->SetFlipVertical(true);
+    
+
+    camera1Node->SetPosition(Vector3(0.0f, 2.0f, -10.0f));
+    camera2Node->SetPosition(Vector3(0.0f, 2.0f, -10.0f));
+    
+    viewport1 = new Viewport(context_, scene1, camera1);
+    viewport2 = new Viewport(context_, scene2, camera2);
+
+    scene1->SetName("coucou");
+
+
+    //overlayRenderPath = new RenderPath();
+    //overlayRenderPath->Load(cache->GetResource<XMLFile>("RenderPaths/ForwardTest.xml"));
+    //viewport1->SetRenderPath(overlayRenderPath);
+    //overlayRenderPath->SetEnabled("quad1", false);
+
+
+    /*Texture2D* renderTexture = new Texture2D(context_);
+    renderTexture->SetSize(800, 600, Graphics::GetRGBFormat(), Urho3D::TEXTURE_RENDERTARGET);
+    renderTexture->SetFilterMode(Urho3D::FILTER_DEFAULT);
+    renderTexture->SetName("fredrt");
+
+    RenderSurface* renderSurface = renderTexture->GetRenderSurface();
+    //SharedPtr<Viewport> viewport(new Viewport(gContext, gScene, cameraTarget));
+    renderSurface->SetViewport(0, viewport1);
+    //renderSurface->SetUpdateMode(Urho3D::SURFACE_UPDATEALWAYS);
+
+    cache->AddManualResource(renderTexture);*/
+
+
+    //Graphics* graphics = GetSubsystem<Graphics>();
+
+    
+          
+
+
+    for (int i = 0; i < 2; i++)
+    {
+        // create renderTarget
+        SharedPtr<Texture2D> renderTexture(new Texture2D(context_));
+        renderTexture->SetSize(graphics->GetWidth(), graphics->GetHeight(), Graphics::GetRGBFormat(), TEXTURE_RENDERTARGET);
+        renderTexture->SetFilterMode(Urho3D::FILTER_DEFAULT);
+        renderTexture->SetName("myrt");
+        cache->AddManualResource(renderTexture);
+
+        // create surface and viewport  
+        SharedPtr<RenderSurface> surface(renderTexture->GetRenderSurface());
+        SharedPtr<Viewport> rttViewport(new Viewport(context_, scene2, camera2));
+        surface->SetViewport(0, rttViewport);
+        surface->SetUpdateMode(SURFACE_UPDATEALWAYS);
+
+        // load render path
+        /*overlayRenderPath = new RenderPath();
+        overlayRenderPath->Load(cache->GetResource<XMLFile>("RenderPaths/ForwardTest.xml"));
+
+        // add fx to renderpath
+        overlayRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/GreyScale.xml"));
+        overlayRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/FXAA2.xml"));
+        overlayRenderPath->SetEnabled("GreyScale", true);
+        overlayRenderPath->SetEnabled("FXAA2", true);
+
+        // setup render target viewport
+        rttViewport->SetRenderPath(overlayRenderPath);*/
+        rttViewport->SetRect(IntRect(10, 10, 512, 512));
+    }
+
+       
+  
+    renderer->SetViewport(0, viewport1);
+
+
+    //renderer->SetViewport(1, viewport2);
+
+
+
+
+
+
+    /*// Execute base class startup
     Sample::Start();
 
     // Create the scene content
@@ -67,12 +196,13 @@ void MultipleViewports::Start()
     SetupViewports();
 
     // Hook up to the frame update and render post-update events
-    SubscribeToEvents();
+    SubscribeToEvents();*/
+
 }
 
 void MultipleViewports::CreateScene()
 {
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    /*ResourceCache* cache = GetSubsystem<ResourceCache>();
 
     scene_ = new Scene(context_);
 
@@ -111,30 +241,30 @@ void MultipleViewports::CreateScene()
     const unsigned NUM_MUSHROOMS = 240;
     for (unsigned i = 0; i < NUM_MUSHROOMS; ++i)
     {
-        Node* mushroomNode = scene_->CreateChild("Mushroom");
-        mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
-        mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
-        mushroomNode->SetScale(0.5f + Random(2.0f));
-        StaticModel* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
-        mushroomObject->SetModel(cache->GetResource<Model>("Models/Mushroom.mdl"));
-        mushroomObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));
-        mushroomObject->SetCastShadows(true);
+    Node* mushroomNode = scene_->CreateChild("Mushroom");
+    mushroomNode->SetPosition(Vector3(Random(90.0f) - 45.0f, 0.0f, Random(90.0f) - 45.0f));
+    mushroomNode->SetRotation(Quaternion(0.0f, Random(360.0f), 0.0f));
+    mushroomNode->SetScale(0.5f + Random(2.0f));
+    StaticModel* mushroomObject = mushroomNode->CreateComponent<StaticModel>();
+    mushroomObject->SetModel(cache->GetResource<Model>("Models/Mushroom.mdl"));
+    mushroomObject->SetMaterial(cache->GetResource<Material>("Materials/Mushroom.xml"));
+    mushroomObject->SetCastShadows(true);
     }
 
     // Create randomly sized boxes. If boxes are big enough, make them occluders
     const unsigned NUM_BOXES = 20;
     for (unsigned i = 0; i < NUM_BOXES; ++i)
     {
-        Node* boxNode = scene_->CreateChild("Box");
-        float size = 1.0f + Random(10.0f);
-        boxNode->SetPosition(Vector3(Random(80.0f) - 40.0f, size * 0.5f, Random(80.0f) - 40.0f));
-        boxNode->SetScale(size);
-        StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
-        boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
-        boxObject->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
-        boxObject->SetCastShadows(true);
-        if (size >= 3.0f)
-            boxObject->SetOccluder(true);
+    Node* boxNode = scene_->CreateChild("Box");
+    float size = 1.0f + Random(10.0f);
+    boxNode->SetPosition(Vector3(Random(80.0f) - 40.0f, size * 0.5f, Random(80.0f) - 40.0f));
+    boxNode->SetScale(size);
+    StaticModel* boxObject = boxNode->CreateComponent<StaticModel>();
+    boxObject->SetModel(cache->GetResource<Model>("Models/Box.mdl"));
+    boxObject->SetMaterial(cache->GetResource<Material>("Materials/Stone.xml"));
+    boxObject->SetCastShadows(true);
+    if (size >= 3.0f)
+    boxObject->SetOccluder(true);
     }
 
     // Create the cameras. Limit far clip distance to match the fog
@@ -154,20 +284,20 @@ void MultipleViewports::CreateScene()
     rearCamera->SetViewOverrideFlags(VO_DISABLE_OCCLUSION);
 
     // Set an initial position for the front camera scene node above the plane
-    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, 0.0f));
+    cameraNode_->SetPosition(Vector3(0.0f, 5.0f, 0.0f));*/
 }
 
 void MultipleViewports::CreateInstructions()
 {
-    ResourceCache* cache = GetSubsystem<ResourceCache>();
+    /* ResourceCache* cache = GetSubsystem<ResourceCache>();
     UI* ui = GetSubsystem<UI>();
 
     // Construct new Text object, set string to display and font to use
     Text* instructionText = ui->GetRoot()->CreateChild<Text>();
     instructionText->SetText(
-        "Use WASD keys and mouse/touch to move\n"
-        "B to toggle bloom, F to toggle FXAA\n"
-        "Space to toggle debug geometry\n"
+    "Use WASD keys and mouse/touch to move\n"
+    "B to toggle bloom, F to toggle FXAA\n"
+    "Space to toggle debug geometry\n"
     );
     instructionText->SetFont(cache->GetResource<Font>("Fonts/Anonymous Pro.ttf"), 15);
     // The text has multiple rows. Center them in relation to each other
@@ -176,19 +306,28 @@ void MultipleViewports::CreateInstructions()
     // Position the text relative to the screen center
     instructionText->SetHorizontalAlignment(HA_CENTER);
     instructionText->SetVerticalAlignment(VA_CENTER);
-    instructionText->SetPosition(0, ui->GetRoot()->GetHeight() / 4);
+    instructionText->SetPosition(0, ui->GetRoot()->GetHeight() / 4);*/
 }
 
 void MultipleViewports::SetupViewports()
 {
-    Graphics* graphics = GetSubsystem<Graphics>();
+    /* Graphics* graphics = GetSubsystem<Graphics>();
     Renderer* renderer = GetSubsystem<Renderer>();
 
     renderer->SetNumViewports(2);
 
+
     // Set up the front camera viewport
     SharedPtr<Viewport> viewport(new Viewport(context_, scene_, cameraNode_->GetComponent<Camera>()));
     renderer->SetViewport(0, viewport);
+
+
+    // Set up the rear camera viewport on top of the front view ("rear view mirror")
+    // The viewport index must be greater in that case, otherwise the view would be left behind
+    SharedPtr<Viewport> rearViewport(new Viewport(context_,scene_,rearCameraNode_->GetComponent<Camera>(),
+    IntRect(graphics->GetWidth() * 2 / 3,32,graphics->GetWidth() - 32,graphics->GetHeight() / 3)));
+
+
 
     // Clone the default render path so that we do not interfere with the other viewport, then add
     // bloom and FXAA post process effects to the front viewport. Render path commands can be tagged
@@ -196,19 +335,18 @@ void MultipleViewports::SetupViewports()
     // disabled.
     ResourceCache* cache = GetSubsystem<ResourceCache>();
     SharedPtr<RenderPath> effectRenderPath = viewport->GetRenderPath()->Clone();
-    effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/Bloom.xml"));
+    effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/GreyScale.xml"));
     effectRenderPath->Append(cache->GetResource<XMLFile>("PostProcess/FXAA2.xml"));
     // Make the bloom mixing parameter more pronounced
-    effectRenderPath->SetShaderParameter("BloomMix", Vector2(0.9f, 0.6f));
-    effectRenderPath->SetEnabled("Bloom", false);
+    //effectRenderPath->SetShaderParameter("BloomMix", Vector2(0.9f, 0.6f));
+    effectRenderPath->SetEnabled("GreyScale", false);
     effectRenderPath->SetEnabled("FXAA2", false);
-    viewport->SetRenderPath(effectRenderPath);
+    rearViewport->SetRenderPath(effectRenderPath);
 
-    // Set up the rear camera viewport on top of the front view ("rear view mirror")
-    // The viewport index must be greater in that case, otherwise the view would be left behind
-    SharedPtr<Viewport> rearViewport(new Viewport(context_, scene_, rearCameraNode_->GetComponent<Camera>(),
-        IntRect(graphics->GetWidth() * 2 / 3, 32, graphics->GetWidth() - 32, graphics->GetHeight() / 3)));
-    renderer->SetViewport(1, rearViewport);
+
+    renderer->SetViewport(1, rearViewport);*/
+
+
 }
 
 void MultipleViewports::SubscribeToEvents()
@@ -223,7 +361,7 @@ void MultipleViewports::SubscribeToEvents()
 
 void MultipleViewports::MoveCamera(float timeStep)
 {
-     // Do not move if the UI has a focused element (the console)
+    // Do not move if the UI has a focused element (the console)
     if (GetSubsystem<UI>()->GetFocusElement())
         return;
 
@@ -241,28 +379,56 @@ void MultipleViewports::MoveCamera(float timeStep)
     pitch_ = Clamp(pitch_, -90.0f, 90.0f);
 
     // Construct new orientation for the camera scene node from yaw and pitch. Roll is fixed to zero
-    cameraNode_->SetRotation(Quaternion(pitch_, yaw_, 0.0f));
+    camera1Node->SetRotation(Quaternion(pitch_, yaw_, 0.0f));
 
     // Read WASD keys and move the camera scene node to the corresponding direction if they are pressed
     if (input->GetKeyDown('W'))
-        cameraNode_->Translate(Vector3::FORWARD * MOVE_SPEED * timeStep);
+        camera1Node->Translate(Vector3::FORWARD * MOVE_SPEED * timeStep);
     if (input->GetKeyDown('S'))
-        cameraNode_->Translate(Vector3::BACK * MOVE_SPEED * timeStep);
+        camera1Node->Translate(Vector3::BACK * MOVE_SPEED * timeStep);
     if (input->GetKeyDown('A'))
-        cameraNode_->Translate(Vector3::LEFT * MOVE_SPEED * timeStep);
+        camera1Node->Translate(Vector3::LEFT * MOVE_SPEED * timeStep);
     if (input->GetKeyDown('D'))
-        cameraNode_->Translate(Vector3::RIGHT * MOVE_SPEED * timeStep);
+        camera1Node->Translate(Vector3::RIGHT * MOVE_SPEED * timeStep);
 
     // Toggle post processing effects on the front viewport. Note that the rear viewport is unaffected
     RenderPath* effectRenderPath = GetSubsystem<Renderer>()->GetViewport(0)->GetRenderPath();
     if (input->GetKeyPress('B'))
-        effectRenderPath->ToggleEnabled("Bloom");
+        effectRenderPath->ToggleEnabled("glowRT");
     if (input->GetKeyPress('F'))
         effectRenderPath->ToggleEnabled("FXAA2");
 
     // Toggle debug geometry with space
     if (input->GetKeyPress(KEY_SPACE))
         drawDebug_ = !drawDebug_;
+
+    if (input->GetKeyPress('R'))
+    {
+        /*Renderer* render = GetSubsystem<Renderer>();
+        RenderPath* effectRenderPath = render->GetViewport(0)->GetRenderPath();
+        effectRenderPath->ToggleEnabled("quad1");*/
+
+        Renderer* render = GetSubsystem<Renderer>();
+        RenderPath* rp = render->GetViewport(0)->GetRenderPath();
+
+        RenderPathCommand cmd;
+        cmd.type_ = CMD_QUAD;
+        cmd.tag_ = "quad1";
+        cmd.vertexShaderName_ = "CopyFramebuffer";
+        cmd.pixelShaderName_ = "CopyFramebuffer";
+        cmd.blendMode_ = BLEND_ADD;
+        cmd.SetOutput(0, "viewport");
+        cmd.SetTextureName(TU_DIFFUSE, "myrt");
+        rp->AddCommand(cmd);
+    }
+
+    if (input->GetKeyPress('G'))
+    {
+        Renderer* render = GetSubsystem<Renderer>();
+        RenderPath* rp = render->GetViewport(0)->GetRenderPath();
+        rp->RemoveCommands("quad1");
+    }
+    
 }
 
 void MultipleViewports::HandleUpdate(StringHash eventType, VariantMap& eventData)
@@ -274,6 +440,7 @@ void MultipleViewports::HandleUpdate(StringHash eventType, VariantMap& eventData
 
     // Move the camera, scale movement with time step
     MoveCamera(timeStep);
+
 }
 
 void MultipleViewports::HandlePostRenderUpdate(StringHash eventType, VariantMap& eventData)
